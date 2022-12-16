@@ -1,21 +1,18 @@
 CC = clang
+CXX = clang++
 CFLAGS = -O2 -g
 OMP = -fopenmp
-
+GTEST = -I/home/amunera/LLVMTesting/gtest_install/include -L/home/amunera/LLVMTesting/gtest_install/lib
+GTEST_LIB = -lgtest
+	
 TDG = -fopenmp-taskgraph -static-tdg
 
 BIN = axpy
-all: $(BIN)_dynamic $(BIN)_static $(BIN)_dynamic_rerecording
+all: $(BIN)
 
 
-$(BIN)_dynamic: $(BIN)_dynamic.c
-	$(CC) -DTDG $(CFLAGS) -fopenmp-taskgraph $(OMP) $^ -o axpy_dynamic
-
-$(BIN)_static: $(BIN)_static.c
-	$(CC) -DTDG $(CFLAGS) $(TDG) $(OMP) $^ -o axpy_static
-
-$(BIN)_dynamic_rerecording: $(BIN)_dynamic_rerecording.c
-	$(CC) -DTDG $(CFLAGS) $(TDG) $(OMP) $^ -o axpy_dynamic_rerecording
+$(BIN): $(BIN).cpp
+	$(CXX) -DTDG $(CFLAGS) $(GTEST) $(TDG) $(OMP) $^ -o axpy $(GTEST_LIB)
 
 clean:
-	rm -f $(BIN)_static $(BIN)_dynamic $(BIN)_dynamic_rerecording *.o tdg.cpp tdg_0.dot tdg_1.dot
+	rm -f $(BIN) *.o tdg.cpp tdg_*.dot
