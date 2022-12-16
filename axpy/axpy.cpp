@@ -114,7 +114,7 @@ TEST(AXPY, RERECORDING)
     }
 
     int tasks_added = 0;
-    #pragma omp parallel shared(x,y, tasks_added)
+    #pragma omp parallel shared(x,y,tasks_added)
     #pragma omp single
     {
       for (int i=0; i<NUM_ITER; i++)
@@ -133,10 +133,10 @@ TEST(AXPY, RERECORDING)
       }
     }
 
-    EXPECT_EQ(tasks_added,5);
+    EXPECT_EQ(tasks_added, 5);
 
-    for (int i = 0; i < N; ++i)
-        EXPECT_EQ(x[i]*(NUM_ITER)+1, y[i]);
+    for (int i=0; i<NUM_ITER; i++)
+        EXPECT_EQ(x[i]*(NUM_ITER)+1,y[i]);
 
     free(x);
     free(y);
@@ -166,6 +166,222 @@ TEST(AXPY, MULTIPLE_DYNAMIC)
       for (int i= NUM_ITER / 2; i<NUM_ITER; i++)
       #ifdef TDG
       #pragma omp taskgraph tdg_type(dynamic)// num_preallocs(2)
+      #endif
+      {
+        saxpy(x, y);
+      }
+    }
+
+    for (int i=0; i<NUM_ITER; i++)
+        EXPECT_EQ(x[i]*(NUM_ITER)+1,y[i]);
+
+    free(x);
+    free(y);
+}
+
+TEST(AXPY, MULTIPLE_STATIC)
+{
+    double *x, *y;
+    x = (double*)malloc(sizeof(double) * N);
+    y = (double*)malloc(sizeof(double) * N);
+
+    for(int i = 0; i < N; ++i){
+        x[i] = y[i] = 1;
+    }
+
+    #pragma omp parallel shared(x,y)
+    #pragma omp single
+    {
+      for (int i=0; i<NUM_ITER / 2; i++)
+      #ifdef TDG
+      #pragma omp taskgraph tdg_type(static)// num_preallocs(2)
+      #endif
+      {
+        saxpy(x, y);
+      }
+
+      for (int i= NUM_ITER / 2; i<NUM_ITER; i++)
+      #ifdef TDG
+      #pragma omp taskgraph tdg_type(static)// num_preallocs(2)
+      #endif
+      {
+        saxpy(x, y);
+      }
+    }
+
+    for (int i=0; i<NUM_ITER; i++)
+        EXPECT_EQ(x[i]*(NUM_ITER)+1,y[i]);
+
+    free(x);
+    free(y);
+}
+
+TEST(AXPY, ONE_STATIC_ONE_DYNAMIC)
+{
+    double *x, *y;
+    x = (double*)malloc(sizeof(double) * N);
+    y = (double*)malloc(sizeof(double) * N);
+
+    for(int i = 0; i < N; ++i){
+        x[i] = y[i] = 1;
+    }
+
+    #pragma omp parallel shared(x,y)
+    #pragma omp single
+    {
+      for (int i=0; i<NUM_ITER / 2; i++)
+      #ifdef TDG
+      #pragma omp taskgraph tdg_type(static)// num_preallocs(2)
+      #endif
+      {
+        saxpy(x, y);
+      }
+
+      for (int i= NUM_ITER / 2; i<NUM_ITER; i++)
+      #ifdef TDG
+      #pragma omp taskgraph tdg_type(dynamic)// num_preallocs(2)
+      #endif
+      {
+        saxpy(x, y);
+      }
+    }
+
+    for (int i=0; i<NUM_ITER; i++)
+        EXPECT_EQ(x[i]*(NUM_ITER)+1,y[i]);
+
+    free(x);
+    free(y);
+}
+
+TEST(AXPY, MULTIPLE_STATIC_ONE_DYNAMIC)
+{
+    double *x, *y;
+    x = (double*)malloc(sizeof(double) * N);
+    y = (double*)malloc(sizeof(double) * N);
+
+    for(int i = 0; i < N; ++i){
+        x[i] = y[i] = 1;
+    }
+
+    #pragma omp parallel shared(x,y)
+    #pragma omp single
+    {
+      for (int i=0; i< 2; i++)
+      #ifdef TDG
+      #pragma omp taskgraph tdg_type(static)// num_preallocs(2)
+      #endif
+      {
+        saxpy(x, y);
+      }
+
+      for (int i=2; i< 5; i++)
+      #ifdef TDG
+      #pragma omp taskgraph tdg_type(static)// num_preallocs(2)
+      #endif
+      {
+        saxpy(x, y);
+      }
+
+      for (int i= NUM_ITER / 2; i<NUM_ITER; i++)
+      #ifdef TDG
+      #pragma omp taskgraph tdg_type(dynamic)// num_preallocs(2)
+      #endif
+      {
+        saxpy(x, y);
+      }
+    }
+
+    for (int i=0; i<NUM_ITER; i++)
+        EXPECT_EQ(x[i]*(NUM_ITER)+1,y[i]);
+
+    free(x);
+    free(y);
+}
+
+TEST(AXPY, ONE_STATIC_MULTIPLE_DYNAMIC)
+{
+    double *x, *y;
+    x = (double*)malloc(sizeof(double) * N);
+    y = (double*)malloc(sizeof(double) * N);
+
+    for(int i = 0; i < N; ++i){
+        x[i] = y[i] = 1;
+    }
+
+    #pragma omp parallel shared(x,y)
+    #pragma omp single
+    {
+      for (int i=0; i< 2; i++)
+      #ifdef TDG
+      #pragma omp taskgraph tdg_type(dynamic)// num_preallocs(2)
+      #endif
+      {
+        saxpy(x, y);
+      }
+
+      for (int i=2; i< 5; i++)
+      #ifdef TDG
+      #pragma omp taskgraph tdg_type(dynamic)// num_preallocs(2)
+      #endif
+      {
+        saxpy(x, y);
+      }
+
+      for (int i= NUM_ITER / 2; i<NUM_ITER; i++)
+      #ifdef TDG
+      #pragma omp taskgraph tdg_type(static)// num_preallocs(2)
+      #endif
+      {
+        saxpy(x, y);
+      }
+    }
+
+    for (int i=0; i<NUM_ITER; i++)
+        EXPECT_EQ(x[i]*(NUM_ITER)+1,y[i]);
+
+    free(x);
+    free(y);
+}
+
+TEST(AXPY, MULTIPLE_STATIC_MULTIPLE_DYNAMIC)
+{
+    double *x, *y;
+    x = (double*)malloc(sizeof(double) * N);
+    y = (double*)malloc(sizeof(double) * N);
+
+    for(int i = 0; i < N; ++i){
+        x[i] = y[i] = 1;
+    }
+
+    #pragma omp parallel shared(x,y)
+    #pragma omp single
+    {
+      for (int i=0; i< 2; i++)
+      #ifdef TDG
+      #pragma omp taskgraph tdg_type(dynamic)// num_preallocs(2)
+      #endif
+      {
+        saxpy(x, y);
+      }
+
+      for (int i=2; i< 5; i++)
+      #ifdef TDG
+      #pragma omp taskgraph tdg_type(dynamic)// num_preallocs(2)
+      #endif
+      {
+        saxpy(x, y);
+      }
+
+      for (int i= 5; i< 8; i++)
+      #ifdef TDG
+      #pragma omp taskgraph tdg_type(static)// num_preallocs(2)
+      #endif
+      {
+        saxpy(x, y);
+      }
+      for (int i= 8; i< NUM_ITER; i++)
+      #ifdef TDG
+      #pragma omp taskgraph tdg_type(static)// num_preallocs(2)
       #endif
       {
         saxpy(x, y);

@@ -1,13 +1,13 @@
 1) Single dynamic TDG                                                 (V)
 2) Single static TDG                                                  (V)
 3) Single dynamic TDG + re-recording                                  (V)
-4) Multiple dynamic TDGs
-5) Multiple static TDGs
+4) Multiple dynamic TDGs                                              (V)
+5) Multiple static TDGs                                               (V)
 6) Combination of static + dynamic TDGs 
-  6.1) 1 static + 1 dynamic
-  6.2) multiple static + 1 dynamic
-  6.3) 1 static + multiple static
-  6.4) multiple static + multiple dynamic
+  6.1) 1 static + 1 dynamic                                           (V)
+  6.2) multiple static + 1 dynamic                                    (V)
+  6.3) 1 static + multiple dynamic                                    (V)
+  6.4) multiple static + multiple dynamic                             (V)
 7) Multiple threads creating TDGs simultaneously (with nowait)
   7.1) 1 static + 1 dynamic
   7.2) multiple static + 1 dynamic
@@ -21,3 +21,5 @@
 9) Task Replication
 10) Taskloop recording
 11) Static-scheduling queues
+12) Taskgraph default synchronous
+13) Taskgraph nowait asynchronous
