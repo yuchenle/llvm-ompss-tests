@@ -1,6 +1,12 @@
 // Part of the CG (Conjugate gradient) method
 // Complete source in BAR/Apps/CG from https://pm.bsc.es/svn/BAR
 
+// Part of Taskgraph directive tests. Verifying the correct
+// behaviors of Taskgraph in different scenarios, as defined in RESULT.txt
+//
+// Using *axpy* benchmark, without task dependencies
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>

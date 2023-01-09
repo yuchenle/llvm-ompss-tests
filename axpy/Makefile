@@ -2,7 +2,7 @@ CC = clang
 CXX = clang++
 CFLAGS = -O2 -g
 OMP = -fopenmp
-GTEST = -I/home/amunera/LLVMTesting/gtest_install/include -L/home/amunera/LLVMTesting/gtest_install/lib
+GTEST = -I$(GTEST_ROOT)/include -L$(GTEST_ROOT)/lib
 GTEST_LIB = -lgtest
 	
 TDG = -fopenmp-taskgraph -static-tdg
