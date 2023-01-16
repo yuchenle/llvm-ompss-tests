@@ -19,13 +19,20 @@
 #define N 8
 #endif
 
-#define NUM_ITER 4
+#define NUM_ITER 8
 #define BS (DIM / N)
 
 unsigned long int square[N][N][BS][BS];
+unsigned long int square1[N][N][BS][BS];
+unsigned long int square2[N][N][BS][BS];
+unsigned long int square3[N][N][BS][BS];
+
 #define SIZE (sizeof(square) / sizeof(long long))
 
-long vanilla_result = 0;
+unsigned long vanilla_result = 0;       // final vanilla_result
+unsigned long vanilla_result_2 = 0;     // vanilla_result after 2 iterations
+unsigned long vanilla_result_4 = 0;     // vanilla_result after 4 iterations
+unsigned long vanilla_last_element = 0; // last element of square after 8 iterations
 
 void init_matrix() {
   int i, j, x, y;
@@ -34,13 +41,30 @@ void init_matrix() {
       for (x = 0; x < BS; x++) {
         for (y = 0; y < BS; y++) {
           square[i][j][x][y] = 2;
+          square1[i][j][x][y] = 2;
+          square2[i][j][x][y] = 2;
+          square3[i][j][x][y] = 2;
+
         }
       }
     }
   }
 }
 
-void sequential(int i, int j) {
+int isEqual(int *original, int *replica){
+  //printf("Ey %d %d \n", *original, *replica); 
+  bool equal = false;
+  if(*original == *replica)
+    equal= true;
+  else
+    printf("Numbers %d %d \n", *original, *replica); 
+
+  EXPECT_EQ(true, equal);
+
+  return 1;
+}
+
+void sequential(int i, int j, unsigned long square[N][N][BS][BS]) {
   int x, y;
 
   /*
@@ -93,61 +117,74 @@ void sequential(int i, int j) {
   }                                   // | | # | |
 }
 
-long wavefront(void) {
+void wavefront(unsigned long square[N][N][BS][BS])  {
   int i, j;
   for (int i = 0; i < N; ++i) {
     for (int j = 0; j < N; ++j) {
       if (j == 0 && i == 0) {
         #pragma omp task depend(inout : square[i][j])
-        { sequential(i, j); }
+        { sequential(i, j, square); }
       } else if (i == 0) {
         #pragma omp task depend(in : square[i][j - 1]) depend(inout : square[i][j])
-        { sequential(i, j); }
+        { sequential(i, j, square); }
       } else if (j == 0) {
         #pragma omp task depend(in : square[i - 1][j]) depend(inout : square[i][j])
-        { sequential(i, j); }
+        { sequential(i, j, square); }
       } else {
         #pragma omp task depend(in : square[i - 1][j])       \
                           depend(in : square[i][j - 1])      \
                           depend(in : square[i - 1][j - 1])  \
                           depend(inout : square[i][j])
-        { sequential(i, j); }
+        { sequential(i, j, square); }
       } // final else
     }   // j
   }     // i
-  return square[N - 1][N - 1][BS - 1][BS - 1];
 }
 
-TEST(WAVEFRONT, DYNAMIC_TDG) {
-  long res=0, res_tdg=0;
+void vanilla_result_computation() {
+  unsigned long sum=0;
   #pragma omp parallel
   #pragma omp single
   {
     init_matrix();
 
     for (int iter = 0; iter < NUM_ITER; iter++) {
-      res += wavefront();
+      wavefront(square);
       #pragma omp taskwait
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];
+      if (iter == 1 && vanilla_result_2 == 0)
+        vanilla_result_2 = sum;
+      if (iter == 3 && vanilla_result_4 == 0)
+        vanilla_result_4 = sum;
     }
-    
-    if (vanilla_result == 0)
-      vanilla_result = res;
+  }
+  if (vanilla_result == 0)
+    vanilla_result = sum;
+  if (vanilla_last_element == 0)
+    vanilla_last_element = square[N - 1][N - 1][BS - 1][BS - 1];
+}
 
+TEST(WAVEFRONT, DYNAMIC_TDG){
+  unsigned long sum = 0, res_tdg=0;
+
+  #pragma omp parallel
+  #pragma omp single
+  {
     init_matrix();
-
     for (int iter = 0; iter < NUM_ITER; iter++) {
       #pragma omp taskgraph tdg_type(dynamic)
-      res_tdg += wavefront();
+      wavefront(square);
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];
     }
-
-    EXPECT_EQ(vanilla_result, res_tdg) << "Dynamic TDG result is diffrent from vanilla result";
+    EXPECT_EQ(vanilla_result, sum) << "Dynamic TDG result is diffrent from vanilla result";
   } // single
 }
+
 
 TEST(WAVEFRONT, STATIC_TDG) {
 
   EXPECT_NE(vanilla_result, 0) << "vanilla result is 0 but it should have been correctly set previously";
-  long res_tdg=0;
+  unsigned long res_tdg=0;
   #pragma omp parallel
   #pragma omp single
   {
@@ -155,14 +192,966 @@ TEST(WAVEFRONT, STATIC_TDG) {
 
     for (int iter = 0; iter < NUM_ITER; iter++) {
       #pragma omp taskgraph tdg_type(static)
-      wavefront();
+      wavefront(square);
+      res_tdg += square[N - 1][N - 1][BS - 1][BS - 1];
     }
 
     EXPECT_EQ(vanilla_result, res_tdg) << "Static TDG result is diffrent from vanilla result";
   } // single
 }
 
+TEST(WAVEFRONT, MULTIPLE_DYNAMIC_TDG){
+  unsigned long sum = 0;
+
+  #pragma omp parallel
+  #pragma omp single
+  {
+    init_matrix();
+
+    for (int iter = 0; iter < NUM_ITER/2; iter++) {
+      #pragma omp taskgraph tdg_type(dynamic)
+      wavefront(square);
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];
+    }
+
+    for (int iter = NUM_ITER/2; iter < NUM_ITER; iter++) {
+      #pragma omp taskgraph tdg_type(dynamic)
+      wavefront(square);
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];
+    }
+
+    EXPECT_EQ(vanilla_result, sum);
+  } // single
+}
+
+TEST(WAVEFRONT, RERECORDING){
+  unsigned long sum = 0, sum1 = 0;
+
+  #pragma omp parallel
+  #pragma omp single
+  {
+    init_matrix();
+
+    for (int iter = 0; iter < NUM_ITER; iter++) {
+      #pragma omp taskgraph tdg_type(dynamic) if(iter == NUM_ITER/2)
+      {
+        if (iter == NUM_ITER/2) {
+          // not to record
+          sum1 = sum;
+          sum = 0;
+          init_matrix();
+        }
+        wavefront(square);
+      }
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];        
+    }
+    EXPECT_EQ(sum1, sum);
+  } // single
+}
+
+TEST(WAVEFRONT, MULTIPLE_STATIC_TDG) {
+  unsigned long sum = 0;
+
+  #pragma omp parallel
+  #pragma omp single
+  {
+    init_matrix();
+
+    for (int iter = 0; iter < NUM_ITER/2; iter++) {
+      #pragma omp taskgraph tdg_type(static)
+      wavefront(square);
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];
+    }
+
+    for (int iter = NUM_ITER/2; iter < NUM_ITER; iter++) {
+      #pragma omp taskgraph tdg_type(static)
+      wavefront(square);
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];
+    }
+
+    EXPECT_EQ(vanilla_result, sum);
+  } // single
+}
+
+TEST(WAVEFRONT, ONE_STATIC_ONE_DYNAMIC) {
+  unsigned long sum = 0;
+
+  #pragma omp parallel
+  #pragma omp single
+  {
+    init_matrix();
+
+    for (int iter = 0; iter < NUM_ITER/2; iter++) {
+      #pragma omp taskgraph tdg_type(static)
+      wavefront(square);
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];
+    }
+
+    for (int iter = NUM_ITER/2; iter < NUM_ITER; iter++) {
+      #pragma omp taskgraph tdg_type(dynamic)
+      wavefront(square);
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];
+    }
+
+    EXPECT_EQ(vanilla_result, sum);
+  } // single
+}
+
+TEST(WAVEFRONT, MULTIPLE_STATIC_ONE_DYNAMIC)
+{
+  unsigned long sum = 0;
+
+  #pragma omp parallel
+  #pragma omp single
+  {
+    init_matrix();
+
+    for (int i = 0; i < NUM_ITER / 4; i++) {
+      #pragma omp taskgraph tdg_type(static)
+      wavefront(square);
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];
+    }
+
+    for (int i = NUM_ITER / 4; i < NUM_ITER / 2; i++){
+      #pragma omp taskgraph tdg_type(static)
+      wavefront(square);
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];
+    }
+
+    for (int i = NUM_ITER / 2; i < NUM_ITER; i++) {
+      #pragma omp taskgraph tdg_type(dynamic)
+      wavefront(square);
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];
+    }
+  }
+
+  EXPECT_EQ(vanilla_result, sum);
+}
+
+TEST(WAVEFRONT, ONE_STATIC_MULTIPLE_DYNAMIC)
+{
+  unsigned long sum = 0;
+
+  #pragma omp parallel
+  #pragma omp single
+  {
+    init_matrix();
+
+    for (int i = 0; i < NUM_ITER / 4; i++) {
+      #pragma omp taskgraph tdg_type(static)
+      wavefront(square);
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];
+    }
+
+    for (int i = NUM_ITER / 4; i < NUM_ITER / 2; i++){
+      #pragma omp taskgraph tdg_type(dynamic)
+      wavefront(square);
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];
+    }
+
+    for (int i = NUM_ITER / 2; i < NUM_ITER; i++) {
+      #pragma omp taskgraph tdg_type(dynamic)
+      wavefront(square);
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];
+    }
+  }
+
+  EXPECT_EQ(vanilla_result, sum);
+}
+
+TEST(WAVEFRONT, MULTIPLE_STATIC_MULTIPLE_DYNAMIC)
+{
+  unsigned long sum = 0;
+
+  #pragma omp parallel
+  #pragma omp single
+  {
+    init_matrix();
+
+    for (int i = 0; i < NUM_ITER / 4; i++) {
+      #pragma omp taskgraph tdg_type(static)
+      wavefront(square);
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];
+    }
+
+    for (int i = NUM_ITER / 4; i < NUM_ITER / 2; i++){
+      #pragma omp taskgraph tdg_type(static)
+      wavefront(square);
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];
+    }
+
+    for (int i = NUM_ITER / 2; i <  3 * NUM_ITER / 4; i++) {
+      #pragma omp taskgraph tdg_type(dynamic)
+      wavefront(square);
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];
+    }
+
+    for (int i = 3 * NUM_ITER / 4; i < NUM_ITER; i++) {
+      #pragma omp taskgraph tdg_type(dynamic)
+      wavefront(square);
+      sum += square[N - 1][N - 1][BS - 1][BS - 1];
+    }
+  }
+
+  EXPECT_EQ(vanilla_result, sum);
+}
+
+TEST(WAVEFRONT, PARALLEL_CREATION_ONE_STATIC_ONE_DYNAMIC)
+{
+  unsigned long sum = 0, sum1 = 0;
+  bool parallelCreation = false;
+  bool volatile firstExecuting = false;
+  bool volatile secondExecuting = false;
+
+  init_matrix();
+
+  #pragma omp parallel shared(parallelCreation,firstExecuting, secondExecuting)
+  {
+    int thid = omp_get_thread_num();
+    if (thid == 0) {
+      for (int i = 0; i < NUM_ITER / 2; i++) {
+        #pragma omp taskgraph tdg_type(static)
+        {
+          #pragma omp critical
+          {
+            firstExecuting = true;
+            if(secondExecuting)
+              parallelCreation = true;
+          }
+          //Sleep to force concurrency
+          sleep(1);
+
+          wavefront(square);
+
+          firstExecuting = false;
+        }
+        sum += square[N - 1][N - 1][BS - 1][BS - 1];
+      }
+    } else if (thid == 1) {
+      for (int i = NUM_ITER / 2; i < NUM_ITER; i++) {
+        #pragma omp taskgraph tdg_type(dynamic)
+        {
+          #pragma omp critical
+          {
+            secondExecuting = true;
+
+            if(firstExecuting)
+              parallelCreation = true;
+          }
+          //Sleep to force concurrency
+          sleep(1);
+
+          wavefront(square1);
+
+          secondExecuting = false;
+        }
+        sum1 += square1[N - 1][N - 1][BS - 1][BS - 1];
+      }
+    }
+  }
+
+  EXPECT_EQ(true, parallelCreation) << "Two Taskgraphs were not created in parallel";
+  EXPECT_EQ(vanilla_result_4, sum) << "Value of sum is different from vanilla OpenMP";
+  EXPECT_EQ(vanilla_result_4, sum1) << "Value of sum is different from vanilla OpenMP";
+
+}
+
+
+TEST(WAVEFRONT, PARALLEL_CREATION_MULTIPLE_STATIC_ONE_DYNAMIC)
+{
+    unsigned long sum = 0, sum1 = 0, sum2 = 0;
+
+    bool parallelCreation = false;
+    bool volatile firstExecuting = false;
+    bool volatile secondExecuting = false;
+    bool volatile thirdExecuting = false;
+
+    init_matrix();
+
+    #pragma omp parallel shared(parallelCreation,firstExecuting, secondExecuting)
+    {
+      int thid = omp_get_thread_num();
+      if (thid == 0) {
+        for (int i = 0; i < NUM_ITER/4; i++) {
+          #pragma omp taskgraph tdg_type(static)
+          {
+            #pragma omp critical
+            {
+              firstExecuting = true;
+              if (secondExecuting && thirdExecuting)
+                parallelCreation = true;
+            }
+            // Sleep to force concurrency
+            sleep(1);
+
+            wavefront(square);
+
+            firstExecuting = false;
+          }
+          sum += square[N - 1][N - 1][BS - 1][BS - 1];
+        }
+      } else if (thid == 1) {
+        for (int i = NUM_ITER/4; i < NUM_ITER/2; i++) {
+          #pragma omp taskgraph tdg_type(static)
+          {
+            #pragma omp critical
+            {
+              secondExecuting = true;
+
+              if (firstExecuting && thirdExecuting)
+                parallelCreation = true;
+            }
+            // Sleep to force concurrency
+            sleep(1);
+
+            wavefront(square1);
+
+            secondExecuting = false;
+          }
+          sum1 += square1[N - 1][N - 1][BS - 1][BS - 1];
+        }
+      } else if (thid == 2) {
+        for (int i = NUM_ITER/2; i < NUM_ITER; i++) {
+          #pragma omp taskgraph tdg_type(dynamic)
+          {
+            #pragma omp critical
+            {
+              thirdExecuting = true;
+
+              if (secondExecuting && firstExecuting)
+                parallelCreation = true;
+            }
+            // Sleep to force concurrency
+            sleep(1);
+
+            wavefront(square2);
+
+            thirdExecuting = false;
+          }
+          sum2 += square2[N - 1][N - 1][BS - 1][BS - 1];
+        }
+      }
+    }
+
+    EXPECT_EQ(true, parallelCreation);
+    EXPECT_EQ(vanilla_result_2, sum);
+    EXPECT_EQ(vanilla_result_2, sum1);
+    EXPECT_EQ(vanilla_result_4, sum2);
+}
+
+
+TEST(WAVEFRONT, PARALLEL_CREATION_ONE_STATIC_MULTIPLE_DYNAMIC)
+{
+    unsigned long sum = 0, sum1 = 0, sum2 = 0;
+
+    bool parallelCreation = false;
+    bool volatile firstExecuting = false;
+    bool volatile secondExecuting = false;
+    bool volatile thirdExecuting = false;
+
+    init_matrix();
+
+    #pragma omp parallel shared(parallelCreation,firstExecuting, secondExecuting)
+    {
+      int thid = omp_get_thread_num();
+      if (thid == 0) {
+        for (int i = 0; i < NUM_ITER/4; i++) {
+          #pragma omp taskgraph tdg_type(static)
+          {
+            #pragma omp critical
+            {
+              firstExecuting = true;
+              if (secondExecuting && thirdExecuting)
+                parallelCreation = true;
+            }
+            // Sleep to force concurrency
+            sleep(1);
+
+            wavefront(square);
+
+            firstExecuting = false;
+          }
+          sum += square[N - 1][N - 1][BS - 1][BS - 1];
+        }
+      } else if (thid == 1) {
+        for (int i = NUM_ITER/4; i < NUM_ITER/2; i++) {
+          #pragma omp taskgraph tdg_type(dynamic)
+          {
+            #pragma omp critical
+            {
+              secondExecuting = true;
+
+              if (firstExecuting && thirdExecuting)
+                parallelCreation = true;
+            }
+            // Sleep to force concurrency
+            sleep(1);
+
+            wavefront(square1);
+
+            secondExecuting = false;
+          }
+          sum1 += square1[N - 1][N - 1][BS - 1][BS - 1];
+        }
+      } else if (thid == 2) {
+        for (int i = NUM_ITER/2; i < NUM_ITER; i++) {
+          #pragma omp taskgraph tdg_type(dynamic)
+          {
+            #pragma omp critical
+            {
+              thirdExecuting = true;
+
+              if (secondExecuting && firstExecuting)
+                parallelCreation = true;
+            }
+            // Sleep to force concurrency
+            sleep(1);
+
+            wavefront(square2);
+
+            thirdExecuting = false;
+          }
+          sum2 += square2[N - 1][N - 1][BS - 1][BS - 1];
+        }
+      }
+    }
+
+    EXPECT_EQ(true, parallelCreation);
+    EXPECT_EQ(vanilla_result_2,sum);
+    EXPECT_EQ(vanilla_result_2,sum1);
+    EXPECT_EQ(vanilla_result_4,sum2);
+}
+
+
+TEST(WAVEFRONT, PARALLEL_CREATION_MULTIPLE_STATIC_MULTIPLE_DYNAMIC)
+{
+  
+    unsigned long sum = 0, sum1 = 0, sum2 = 0, sum3 = 0;
+
+    bool parallelCreation = false;
+    bool volatile firstExecuting = false;
+    bool volatile secondExecuting = false;
+    bool volatile thirdExecuting = false;
+    bool volatile fourthExecuting = false;
+
+    init_matrix();
+
+    #pragma omp parallel shared(parallelCreation,firstExecuting, secondExecuting)
+    {
+      int thid = omp_get_thread_num();
+      if (thid == 0) {
+        for (int i = 0; i < NUM_ITER/4; i++) {
+          #pragma omp taskgraph tdg_type(static)
+          {
+            #pragma omp critical
+            {
+              firstExecuting = true;
+              if (secondExecuting && thirdExecuting && fourthExecuting)
+                parallelCreation = true;
+            }
+            // Sleep to force concurrency
+            sleep(1);
+
+            wavefront(square);
+
+            firstExecuting = false;
+          }
+          sum += square[N - 1][N - 1][BS - 1][BS - 1];
+        }
+      } else if (thid == 1) {
+        for (int i = NUM_ITER/4; i < NUM_ITER/2; i++) {
+          #pragma omp taskgraph tdg_type(dynamic)
+          {
+            #pragma omp critical
+            {
+              secondExecuting = true;
+
+              if (firstExecuting && thirdExecuting && fourthExecuting)
+                parallelCreation = true;
+            }
+            // Sleep to force concurrency
+            sleep(1);
+
+            wavefront(square1);
+
+            secondExecuting = false;
+          }
+          sum1 += square1[N - 1][N - 1][BS - 1][BS - 1];
+        }
+      } else if (thid == 2) {
+        for (int i = NUM_ITER/2; i < NUM_ITER/4 * 3; i++) {
+          #pragma omp taskgraph tdg_type(dynamic)
+          {
+            #pragma omp critical
+            {
+              thirdExecuting = true;
+
+              if (secondExecuting && firstExecuting && fourthExecuting)
+                parallelCreation = true;
+            }
+            // Sleep to force concurrency
+            sleep(1);
+
+            wavefront(square2);
+
+            thirdExecuting = false;
+          }
+          sum2 += square2[N - 1][N - 1][BS - 1][BS - 1];
+        }
+      } else if (thid == 4) {
+        for (int i = 3 * NUM_ITER/4; i < NUM_ITER; i++) {
+          #pragma omp taskgraph tdg_type(dynamic)
+          {
+            #pragma omp critical
+            {
+              fourthExecuting = true;
+
+              if (secondExecuting && firstExecuting && thirdExecuting)
+                parallelCreation = true;
+            }
+            // Sleep to force concurrency
+            sleep(1);
+
+            wavefront(square3);
+
+            fourthExecuting = false;
+          }
+          sum3 += square3[N - 1][N - 1][BS - 1][BS - 1];
+        }
+      }
+    }
+
+    EXPECT_EQ(true, parallelCreation);
+    EXPECT_EQ(vanilla_result_2, sum);
+    EXPECT_EQ(vanilla_result_2, sum1);
+    EXPECT_EQ(vanilla_result_2, sum2);
+    EXPECT_EQ(vanilla_result_2, sum3);
+}
+
+
+TEST(WAVEFRONT, PARALLEL_EXECUTION_ONE_STATIC_ONE_DYNAMIC)
+{
+    bool volatile firstFinished = false;
+    bool parallelExecution = true;
+
+    init_matrix();
+
+    #pragma omp parallel shared(parallelExecution)
+    #pragma omp single
+    {
+      for (int j= 0; j < 2 ; j++) {
+        firstFinished = false;
+        #pragma omp taskgraph tdg_type(dynamic) nowait
+        {
+          for (int i=0; i<NUM_ITER / 2; i++)
+            wavefront(square);
+
+          #pragma omp task
+          {
+            sleep(1);
+            firstFinished = true;
+          }
+        }
+
+        #pragma omp taskgraph tdg_type(static)
+        {
+          #pragma omp task
+          {
+            if(j == 1 && firstFinished)
+              parallelExecution = false;
+          }
+        }
+      }
+    }
+
+    //The parallel execution works because main thread starts executing tasks from the tail instead the head once it finishes the creation, and the task from the second taskgraph is the tail of the queue
+    EXPECT_EQ(true, parallelExecution);
+    EXPECT_EQ(vanilla_last_element, square[N - 1][N - 1][BS - 1][BS - 1]);
+}
+
+TEST(WAVEFRONT, PARALLEL_EXECUTION_MULTIPLE_STATIC_ONE_DYNAMIC)
+{
+    bool volatile firstFinished = false;
+    bool parallelExecution = true;
+
+    init_matrix();
+
+    #pragma omp parallel shared(parallelExecution)
+    #pragma omp single
+    {
+      for (int j= 0; j < 2 ; j++) {
+        firstFinished = false;
+        #pragma omp taskgraph tdg_type(dynamic) nowait
+        {
+          for (int i=0; i<NUM_ITER / 2; i++)
+            wavefront(square);
+          
+          #pragma omp task
+          {
+            sleep(1);
+            firstFinished = true;
+          }
+        }
+        #pragma omp taskgraph tdg_type(static)
+        {
+          #pragma omp task
+          {
+            if( j== 1 && firstFinished)
+              parallelExecution = false;
+          }
+        }
+        #pragma omp taskgraph tdg_type(static)
+        {
+          #pragma omp task
+          {
+            if( j== 1 && firstFinished)
+              parallelExecution = false;
+          }
+        }
+      }
+    }
+
+    //The parallel execution works because main thread starts executing tasks from the tail instead the head once it finishes the creation, and the task from the second taskgraph is the tail of the queue
+    EXPECT_EQ(true, parallelExecution);
+    EXPECT_EQ(vanilla_last_element, square[N - 1][N - 1][BS - 1][BS - 1]);
+}
+
+TEST(WAVEFRONT, PARALLEL_EXECUTION_ONE_STATIC_MULTIPLE_DYNAMIC)
+{
+    bool volatile firstFinished = false;
+    bool parallelExecution = true;
+
+    init_matrix();
+
+    #pragma omp parallel shared(parallelExecution)
+    #pragma omp single
+    {
+      for (int j= 0; j < 8; j++) {
+        firstFinished = false;
+        #pragma omp taskgraph tdg_type(static) nowait
+        {
+          // #pragma omp task
+          // {
+          //   printf("starting, num_iterations = %d, %d, %d\n", NUM_ITER, N, BS);
+          // }
+          for (int i = 0; i < NUM_ITER / 8; i++)
+            wavefront(square);
+
+          #pragma omp task
+          {
+            sleep(1);
+            firstFinished = true;
+            // printf("ending\n");
+          }
+        }
+        #pragma omp taskgraph tdg_type(dynamic)
+        {
+          #pragma omp task
+          {
+            if( j== 1 && firstFinished)
+              parallelExecution = false;
+          }
+        }
+        #pragma omp taskgraph tdg_type(dynamic)
+        {
+          #pragma omp task
+          {
+            if( j== 1 && firstFinished)
+              parallelExecution = false;
+          }
+        }
+      }
+    }
+
+    //The parallel execution works because main thread starts executing tasks from the tail instead the head once it finishes the creation, and the task from the second taskgraph is the tail of the queue
+    EXPECT_EQ(true, parallelExecution);
+    EXPECT_EQ(vanilla_last_element, square[N - 1][N - 1][BS - 1][BS - 1]);
+}
+
+
+TEST(WAVEFRONT, PARALLEL_EXECUTION_MULTIPLE_STATIC_MULTIPLE_DYNAMIC)
+{
+  bool volatile firstFinished = false;
+  bool parallelExecution = true;
+  init_matrix();
+  #pragma omp parallel shared(parallelExecution)
+  #pragma omp single
+  {
+    for (int j= 0; j < 8 ; j++) {
+      firstFinished = false;
+      #pragma omp taskgraph tdg_type(static) nowait
+      {
+        for (int i=0; i<NUM_ITER / 8; i++)
+          wavefront(square);
+
+        #pragma omp task
+        {
+          sleep(1);
+          firstFinished = true;
+        }
+      }
+      #pragma omp taskgraph tdg_type(dynamic)
+      {
+        #pragma omp task
+        {
+          if( j== 1 && firstFinished)
+            parallelExecution = false;
+        }
+      }
+      #pragma omp taskgraph tdg_type(dynamic)
+      {
+        #pragma omp task
+        {
+          if( j== 1 && firstFinished)
+            parallelExecution = false;
+        }
+      }
+      #pragma omp taskgraph tdg_type(static)
+      {
+        #pragma omp task
+        {
+          if( j== 1 && firstFinished)
+            parallelExecution = false;
+        }
+      }
+    }
+  }
+
+  //The parallel execution works because main thread starts executing tasks from the tail instead the head once it finishes the creation, and the task from the second taskgraph is the tail of the queue
+  EXPECT_EQ(true, parallelExecution);
+  EXPECT_EQ(vanilla_last_element, square[N - 1][N - 1][BS - 1][BS - 1]);
+}
+
+
+TEST(WAVEFRONT, ASYNCHRONOUS_TDGS_NOWAIT)
+{
+  bool volatile firstFinished = false;
+  bool parallelCreation = true;
+
+  init_matrix();
+
+  #pragma omp parallel shared(parallelCreation)
+  #pragma omp single
+  {
+    #pragma omp taskgraph tdg_type(static) nowait
+    {
+      for (int i = 0; i < NUM_ITER / 2; i++)
+        wavefront(square);
+
+      #pragma omp task
+      {
+        sleep(2);
+        firstFinished = true;
+      }
+    }
+
+    #pragma omp taskgraph tdg_type(dynamic) nowait
+    {
+      if(firstFinished)
+          parallelCreation = false;
+
+      for (int i = NUM_ITER / 2; i < NUM_ITER; i++)
+        wavefront(square);
+    }
+  }
+  EXPECT_EQ(true, parallelCreation);
+}
+
+TEST(WAVEFRONT, SYNCHRONOUS_TDGS_DEFAULT)
+{
+  bool volatile firstFinished = false;
+  bool parallelCreation = true;
+
+  init_matrix();
+
+  #pragma omp parallel shared(parallelCreation)
+  #pragma omp single
+  {
+    #pragma omp taskgraph tdg_type(static)
+    {
+      for (int i = 0; i < NUM_ITER / 2; i++)
+        wavefront(square);
+
+      #pragma omp task
+      {
+        sleep(1);
+        firstFinished = true;
+      }
+    }
+
+    #pragma omp taskgraph tdg_type(dynamic)
+    {
+      if(firstFinished)
+          parallelCreation = false;
+
+      for (int i = NUM_ITER / 2; i < NUM_ITER; i++)
+        wavefront(square);
+    }
+  }
+  EXPECT_EQ(false, parallelCreation);
+}
+
+
+TEST(WAVEFRONT, SYNCHRONOUS_DYNAMIC_TDG_CREATION)
+{
+  bool volatile firstFinished = false;
+  bool parallelCreation = true;
+  bool parallelExecution = true;
+
+  init_matrix();
+
+  #pragma omp parallel shared(parallelCreation, parallelExecution)
+  #pragma omp single
+  {
+    for (int j= 0; j < NUM_ITER ; j++) {
+      firstFinished = false;
+      #pragma omp taskgraph tdg_type(dynamic) nowait
+      {
+        wavefront(square);
+
+        #pragma omp task
+        {
+          sleep(1);
+          firstFinished = true;
+        }
+      }
+
+      #pragma omp taskgraph tdg_type(static)
+      {
+        if( j== 0 && firstFinished)
+            parallelCreation = false;
+
+        #pragma omp task
+        {
+          if( j >= 1 && firstFinished)
+            parallelExecution = false;
+        }
+      }
+    }
+  }
+
+  EXPECT_EQ(false, parallelCreation);
+  //The parallel execution works because main thread starts executing tasks from the tail instead the head once it finishes the creation, and the task from the second taskgraph is the tail of the queue
+  EXPECT_EQ(true, parallelExecution);
+  EXPECT_EQ(vanilla_last_element, square[N - 1][N - 1][BS - 1][BS - 1]);
+}
+
+TEST(WAVEFRONT, TASK_REPLICATION_VANILLA)
+{
+  init_matrix();
+  
+  int one = 1;
+  #pragma omp parallel
+  #pragma omp single
+  {
+    int nreplicas_detected = 0;
+    int dummy = 2;
+
+    for (int i=0; i<NUM_ITER; i++) {
+      {
+        #pragma omp task shared(dummy, nreplicas_detected) replicated(3, dummy, isEqual)
+        {
+            dummy++;
+            #pragma omp atomic
+            nreplicas_detected++;
+        }
+        wavefront(square);
+      }
+    }
+    EXPECT_EQ(2+NUM_ITER, dummy);
+    EXPECT_EQ(NUM_ITER*4, nreplicas_detected);
+  }
+
+  EXPECT_EQ(vanilla_last_element, square[N - 1][N - 1][BS - 1][BS - 1]);
+}
+
+
+
+TEST(WAVEFRONT, TASK_REPLICATION_TDG)
+{
+  init_matrix();
+  #pragma omp parallel
+  #pragma omp single
+  {
+    int nreplicas_detected = 0;
+    int dummy = 2;
+
+    for (int i=0; i<NUM_ITER; i++) {
+      #pragma omp taskgraph tdg_type(dynamic)
+      {
+        wavefront(square);
+        #pragma omp task shared(dummy, nreplicas_detected) replicated(3, dummy, isEqual)
+        {
+          dummy++;
+          #pragma omp atomic
+          nreplicas_detected++;
+        }
+      }
+    }
+    EXPECT_EQ(2+NUM_ITER, dummy);
+    EXPECT_EQ(NUM_ITER*4, nreplicas_detected);
+  }
+  EXPECT_EQ(vanilla_last_element,square[N - 1][N - 1][BS - 1][BS - 1]);
+}
+
+TEST(WAVEFRONT, TASK_REPLICATION_SPATIAL)
+{
+  init_matrix();
+  #pragma omp parallel
+  #pragma omp single
+  {
+    int nreplicas_detected = 0;
+    int dummy = 2;
+
+    for (int i=0; i<NUM_ITER; i++) {
+      #pragma omp taskgraph tdg_type(dynamic)
+      {
+        #pragma omp task shared(dummy, nreplicas_detected) replicated(3, dummy, isEqual, spatial)
+        {
+            dummy++;
+            #pragma omp atomic
+            nreplicas_detected++;
+        }
+        wavefront(square);
+      }
+    }
+    EXPECT_EQ(2+NUM_ITER, dummy);
+    EXPECT_EQ(NUM_ITER*4, nreplicas_detected);
+  }
+  EXPECT_EQ(vanilla_last_element, square[N - 1][N - 1][BS - 1][BS - 1]);
+}
+
+TEST(AXPY, TASK_REPLICATION_TEMPORAL)
+{
+    init_matrix();
+
+    #pragma omp parallel
+    #pragma omp single
+    {
+      int nreplicas_detected = 0;
+      int dummy = 2;
+
+      for (int i=0; i<NUM_ITER; i++) {
+        #ifdef TDG
+        #pragma omp taskgraph tdg_type(dynamic)
+        #endif
+        {
+          #pragma omp task shared(dummy, nreplicas_detected) replicated(3, dummy, isEqual, temporal)
+          {
+              dummy++;
+              nreplicas_detected++;
+          }
+          wavefront(square);
+        }
+      }
+      EXPECT_EQ(2+NUM_ITER, dummy);
+      EXPECT_EQ(NUM_ITER*4, nreplicas_detected);
+    }
+    EXPECT_EQ(vanilla_last_element, square[N - 1][N - 1][BS - 1][BS - 1]);
+}
+
 int main(int argc, char **argv) {
+  vanilla_result_computation();
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

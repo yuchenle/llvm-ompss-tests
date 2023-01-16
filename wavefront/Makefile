@@ -13,5 +13,5 @@ $(BIN)_gtest: $(BIN).cpp
 	$(CXX) $(CFLAGS) $^ $(OMP) $(TDG) $(GTEST) $(GTEST_LIB) -o $@
 
 clean:
-	rm -f *.o $(BIN)_gtest
+	rm -f *.o $(BIN)_gtest tdg_*.dot tdg.cpp
 
