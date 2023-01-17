@@ -1,3 +1,9 @@
+# The NPB-OMP benchmark suite is modified to perform taskgraph tests related to taskloop.
+**To build CG (Conjugate Gradient) benchmark: `make cg`, this will build binaries in bin folder.**
+**To build UT (Unit Test), `make ut`. The generated binary will also be moved to bin.**
+
+Below the original README.md
+
 # The NAS Parallel Benchmarks for evaluating C++ parallel programming frameworks on shared-memory architectures
 
 The NPB's Fortran codes were carefully ported to **C++** and are fully compliant to the **NPB3.4.1** version ([NPB official webpage](https://www.nas.nasa.gov/publications/npb.html)). Our [paper](https://doi.org/10.1016/j.future.2021.07.021) contains abundant information on how the porting was conducted and discusses the outcome performance we obtained with **NPB-CPP** on different machines (Intel Xeon, AMD Epyc, and IBM Power8) and compilers (GCC, ICC, and Clang). Results showed that we achieved similar performance with **NPB-CPP** compared to the original **NPB**. **You can use our paper, along with the official reports, as a guide to assess performance using the NPB suite**.
