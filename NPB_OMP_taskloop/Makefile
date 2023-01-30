@@ -27,6 +27,7 @@ clean:
 	- rm -f core 
 	- rm -f *~ */core */*~ */*.o */npbparams.hpp */*.obj */*.exe
 	- rm -f sys/setparams sys/makesuite sys/setparams.hpp
+	- rm -f bin/*
 
 cleanall: clean
 	- rm -r bin/*

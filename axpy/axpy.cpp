@@ -471,7 +471,7 @@ TEST(AXPY, PARALLEL_CREATION_ONE_STATIC_ONE_DYNAMIC)
       if (thid == 0) {
         for (int i = 0; i < NUM_ITER / 2; i++)
         #ifdef TDG
-        #pragma omp taskgraph tdg_type(static)
+        #pragma omp taskgraph tdg_type(static) nowait
         #endif
         {
           #pragma omp critical
@@ -490,7 +490,7 @@ TEST(AXPY, PARALLEL_CREATION_ONE_STATIC_ONE_DYNAMIC)
       } else if (thid == 1) {
         for (int i = NUM_ITER / 2; i < NUM_ITER; i++)
         #ifdef TDG
-        #pragma omp taskgraph tdg_type(dynamic)
+        #pragma omp taskgraph tdg_type(dynamic) nowait
         #endif
         {
           #pragma omp critical
@@ -547,7 +547,7 @@ TEST(AXPY, PARALLEL_CREATION_MULTIPLE_STATIC_ONE_DYNAMIC)
       if (thid == 0) {
         for (int i = 0; i < 3; i++)
         #ifdef TDG
-        #pragma omp taskgraph tdg_type(static) 
+        #pragma omp taskgraph tdg_type(static) nowait
         #endif
         {
           #pragma omp critical
@@ -566,7 +566,7 @@ TEST(AXPY, PARALLEL_CREATION_MULTIPLE_STATIC_ONE_DYNAMIC)
       } else if (thid == 1) {
         for (int i = 3; i < 8; i++)
         #ifdef TDG
-        #pragma omp taskgraph tdg_type(static) 
+        #pragma omp taskgraph tdg_type(static) nowait
         #endif
         {
           #pragma omp critical
@@ -586,7 +586,7 @@ TEST(AXPY, PARALLEL_CREATION_MULTIPLE_STATIC_ONE_DYNAMIC)
       } else if (thid == 2) {
         for (int i = 8; i < NUM_ITER; i++)
         #ifdef TDG
-        #pragma omp taskgraph tdg_type(dynamic) 
+        #pragma omp taskgraph tdg_type(dynamic) nowait
         #endif
         {
           #pragma omp critical
@@ -644,7 +644,7 @@ TEST(AXPY, PARALLEL_CREATION_ONE_STATIC_MULTIPLE_DYNAMIC)
       if (thid == 0) {
         for (int i = 0; i < 3; i++)
         #ifdef TDG
-        #pragma omp taskgraph tdg_type(static) 
+        #pragma omp taskgraph tdg_type(static) nowait
         #endif
         {
           #pragma omp critical
@@ -663,7 +663,7 @@ TEST(AXPY, PARALLEL_CREATION_ONE_STATIC_MULTIPLE_DYNAMIC)
       } else if (thid == 1) {
         for (int i = 3; i < 8; i++)
         #ifdef TDG
-        #pragma omp taskgraph tdg_type(dynamic) 
+        #pragma omp taskgraph tdg_type(dynamic) nowait
         #endif
         {
           #pragma omp critical
@@ -683,7 +683,7 @@ TEST(AXPY, PARALLEL_CREATION_ONE_STATIC_MULTIPLE_DYNAMIC)
       } else if (thid == 2) {
         for (int i = 8; i < NUM_ITER; i++)
         #ifdef TDG
-        #pragma omp taskgraph tdg_type(dynamic) 
+        #pragma omp taskgraph tdg_type(dynamic) nowait
         #endif
         {
           #pragma omp critical
@@ -743,7 +743,7 @@ TEST(AXPY, PARALLEL_CREATION_MULTIPLE_STATIC_MULTIPLE_DYNAMIC)
       if (thid == 0) {
         for (int i = 0; i < 2; i++)
         #ifdef TDG
-        #pragma omp taskgraph tdg_type(static) 
+        #pragma omp taskgraph tdg_type(static) nowait
         #endif
         {
           #pragma omp critical
@@ -762,7 +762,7 @@ TEST(AXPY, PARALLEL_CREATION_MULTIPLE_STATIC_MULTIPLE_DYNAMIC)
       } else if (thid == 1) {
         for (int i = 2; i < 5; i++)
         #ifdef TDG
-        #pragma omp taskgraph tdg_type(dynamic) 
+        #pragma omp taskgraph tdg_type(dynamic) nowait
         #endif
         {
           #pragma omp critical
@@ -782,7 +782,7 @@ TEST(AXPY, PARALLEL_CREATION_MULTIPLE_STATIC_MULTIPLE_DYNAMIC)
       } else if (thid == 2) {
         for (int i = 5; i < 8; i++)
         #ifdef TDG
-        #pragma omp taskgraph tdg_type(dynamic) 
+        #pragma omp taskgraph tdg_type(dynamic) nowait
         #endif
         {
           #pragma omp critical
@@ -802,7 +802,7 @@ TEST(AXPY, PARALLEL_CREATION_MULTIPLE_STATIC_MULTIPLE_DYNAMIC)
       } else if (thid == 4) {
         for (int i = 8; i < NUM_ITER; i++)
         #ifdef TDG
-        #pragma omp taskgraph tdg_type(dynamic) 
+        #pragma omp taskgraph tdg_type(dynamic) nowait
         #endif
         {
           #pragma omp critical
