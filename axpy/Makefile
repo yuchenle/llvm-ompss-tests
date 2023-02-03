@@ -8,11 +8,14 @@ GTEST_LIB = -lgtest
 TDG = -fopenmp-taskgraph -static-tdg
 
 BIN = axpy
-all: $(BIN)
+all: $(BIN)_gtest $(BIN)_prealloc_gtest
 
 
-$(BIN): $(BIN).cpp
-	$(CXX) -DTDG $(CFLAGS) $(GTEST) $(TDG) $(OMP) $^ -o axpy $(GTEST_LIB)
+$(BIN)_gtest: $(BIN).cpp
+	$(CXX) -DTDG $(CFLAGS) $(GTEST) $(TDG) $(OMP) $^ -o $@ $(GTEST_LIB)
+
+$(BIN)_prealloc_gtest: $(BIN)_prealloc.cpp
+	$(CXX) -DTDG $(CFLAGS) $(GTEST) $(TDG) -prealloc $(OMP) $^ -o $@ $(GTEST_LIB)
 
 clean:
-	rm -f $(BIN) *.o tdg.cpp tdg_*.dot
+	rm -f $(BIN)_gtest $(BIN)_prealloc_gtest *.o tdg.cpp tdg_*.dot
