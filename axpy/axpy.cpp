@@ -129,6 +129,36 @@ TEST(AXPY, DYNAMIC_TDG)
     free(y);
 }
 
+TEST(AXPY, DYNAMIC_TDG_1_THREAD)
+{
+    double *x, *y;
+    x = (double*)malloc(sizeof(double) * N);
+    y = (double*)malloc(sizeof(double) * N);
+
+    for(int i = 0; i < N; ++i){
+        x[i] = y[i] = 1;
+    }
+
+    #pragma omp parallel num_threads(1) shared(x,y)
+    #pragma omp single
+    {
+      for (int i=0; i<NUM_ITER; i++)
+      #ifdef TDG
+      #pragma omp taskgraph tdg_type(dynamic)
+      #endif
+      {
+        saxpy(x, y);
+      }
+    }
+
+    for (int i=0; i<NUM_ITER; i++)
+        EXPECT_EQ(x[i]*(NUM_ITER)+1,y[i]);
+
+    free(x);
+    free(y);
+}
+
+
 TEST(AXPY, STATIC_TDG)
 {
     double *x, *y;
@@ -140,6 +170,35 @@ TEST(AXPY, STATIC_TDG)
     }
 
     #pragma omp parallel shared(x,y)
+    #pragma omp single
+    {
+      for (int i=0; i<NUM_ITER; i++)
+      #ifdef TDG
+      #pragma omp taskgraph tdg_type(static)
+      #endif
+      {
+        saxpy(x, y);
+      }
+    }
+
+    for (int i=0; i<NUM_ITER; i++)
+        EXPECT_EQ(x[i]*(NUM_ITER)+1,y[i]);
+
+    free(x);
+    free(y);
+}
+
+TEST(AXPY, STATIC_TDG_1_THREAD)
+{
+    double *x, *y;
+    x = (double*)malloc(sizeof(double) * N);
+    y = (double*)malloc(sizeof(double) * N);
+
+    for(int i = 0; i < N; ++i){
+        x[i] = y[i] = 1;
+    }
+
+    #pragma omp parallel num_threads(1) shared(x,y)
     #pragma omp single
     {
       for (int i=0; i<NUM_ITER; i++)
@@ -196,6 +255,7 @@ TEST(AXPY, RERECORDING)
     free(x);
     free(y);
 }
+
 
 TEST(AXPY, MULTIPLE_DYNAMIC)
 {
