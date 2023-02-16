@@ -1006,6 +1006,7 @@ TEST(WAVEFRONT, TASK_REPLICATION_VANILLA)
       {
         #pragma omp task shared(dummy, nreplicas_detected) replicated(3, dummy, isEqual)
         {
+            #pragma omp atomic
             dummy++;
             #pragma omp atomic
             nreplicas_detected++;
@@ -1037,6 +1038,7 @@ TEST(WAVEFRONT, TASK_REPLICATION_TDG)
         wavefront(square);
         #pragma omp task shared(dummy, nreplicas_detected) replicated(3, dummy, isEqual)
         {
+          #pragma omp atomic
           dummy++;
           #pragma omp atomic
           nreplicas_detected++;
@@ -1063,6 +1065,7 @@ TEST(WAVEFRONT, TASK_REPLICATION_SPATIAL)
       {
         #pragma omp task shared(dummy, nreplicas_detected) replicated(3, dummy, isEqual, spatial)
         {
+            #pragma omp atomic
             dummy++;
             #pragma omp atomic
             nreplicas_detected++;
@@ -1093,7 +1096,9 @@ TEST(WAVEFRONT, TASK_REPLICATION_TEMPORAL)
         {
           #pragma omp task shared(dummy, nreplicas_detected) replicated(3, dummy, isEqual, temporal)
           {
+              #pragma omp atomic
               dummy++;
+              #pragma omp atomic
               nreplicas_detected++;
           }
           wavefront(square);

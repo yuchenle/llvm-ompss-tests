@@ -1336,6 +1336,7 @@ TEST(AXPY, TASK_REPLICATION_VANILLA)
         {
           #pragma omp task shared(dummy, nreplicas_detected) replicated(3, dummy, isEqual)
           {
+              #pragma omp atomic
               dummy++;
               #pragma omp atomic
               nreplicas_detected++;
@@ -1377,6 +1378,7 @@ TEST(AXPY, TASK_REPLICATION_TDG)
         {
           #pragma omp task shared(dummy, nreplicas_detected) replicated(3, dummy, isEqual)
           {
+              #pragma omp atomic
               dummy++;
               #pragma omp atomic
               nreplicas_detected++;
@@ -1418,6 +1420,7 @@ TEST(AXPY, TASK_REPLICATION_SPATIAL)
         {
           #pragma omp task shared(dummy, nreplicas_detected) replicated(3, dummy, isEqual, spatial)
           {
+              #pragma omp atomic
               dummy++;
               #pragma omp atomic
               nreplicas_detected++;
@@ -1459,7 +1462,9 @@ TEST(AXPY, TASK_REPLICATION_TEMPORAL)
         {
           #pragma omp task shared(dummy, nreplicas_detected) replicated(3, dummy, isEqual, temporal)
           {
+              #pragma omp atomic
               dummy++;
+              #pragma omp atomic
               nreplicas_detected++;
           }
           saxpy(x, y);
