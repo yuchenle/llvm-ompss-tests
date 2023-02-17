@@ -25,7 +25,7 @@
   12.1) default                                                       (V)
   12.2) spatial                                                       (V)
   12.3) temporal                                                      (V)
-13) Taskloop recording
-14) Taskloop nowait + vanilla tasks
-15) Static-scheduling queues
+13) Taskloop recording                                                (V)
+14) Taskloop nowait + vanilla tasks                                   
+15) Static-scheduling queues                                          (V)
 16) Tasgraph tasks + vanilla tasks                                    (V)
